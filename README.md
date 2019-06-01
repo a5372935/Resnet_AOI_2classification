@@ -8,3 +8,13 @@ Good smaple:
 NG smaple:
 
 ![image](https://github.com/a5372935/Resnet_AOI_2classification/blob/master/NG_sameple.jpg)
+
+AOI_epoch_acc and AOI_epoch_loss:
+
+![image](https://github.com/a5372935/Resnet_AOI_2classification/blob/master/Resnet_34_SGD(1e-3)/epoch_acc.JPG)
+![image](https://github.com/a5372935/Resnet_AOI_2classification/blob/master/Resnet_34_SGD(1e-3)/epoch_loss.JPG)
+
+AOI_epoch_val_acc and AOI_epoch_val_loss:
+
+![image](https://github.com/a5372935/Resnet_AOI_2classification/blob/master/Resnet_34_SGD(1e-3)/epoch_val_acc.JPG)
+![image](https://github.com/a5372935/Resnet_AOI_2classification/blob/master/Resnet_34_SGD(1e-3)/epoch_val_loss.JPG)
