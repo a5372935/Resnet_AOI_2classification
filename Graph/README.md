@@ -1,3 +1,3 @@
 # Resnet_AOI_2classification
 
-Use Tensorboard --logdir path in cmd
+Use Tensorboard --logdir Folder path        #in cmd
