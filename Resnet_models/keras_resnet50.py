@@ -1,131 +1,181 @@
-import tensorflow as tf
-from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, Add, Input, ZeroPadding2D, MaxPooling2D, AveragePooling2D, GlobalAveragePooling2D, add
-from tensorflow.keras.layers import Flatten, Dense, Dropout
+import numpy as np
+import warnings
+
+from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, Activation, ZeroPadding2D, AveragePooling2D, MaxPooling2D, GlobalAveragePooling2D, GlobalMaxPooling2D
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import add, Flatten
 from tensorflow.keras.models import Model
+from tensorflow.keras.preprocessing import image
+import tensorflow.keras.backend as K
+from keras_applications.imagenet_utils import _obtain_input_shape
+from keras.engine.topology import get_source_inputs
 
-
-def identity_block(input_shape, f, filters, stage, block):
-    # defining name basis
+def identity_block(input_tensor, kernel_size, filters, stage, block):
+    
+    filters1, filters2, filters3 = filters
+    if K.image_data_format() == 'channels_last':
+        bn_axis = 3
+    else:
+        bn_axis = 1
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
-    
-    # Retrieve Filters
-    F1, F2, F3 = filters
-    
-    # Save the input value. You'll need this later to add back to the main path. 
-    X_shortcut = input_shape
-    
-    # First component of main path
-    X = Conv2D(filters = F1, kernel_size = (1, 1), kernel_initializer='he_normal', name = conv_name_base + '2a')(input_shape)
-    X = BatchNormalization(axis = 3, name = bn_name_base + '2a')(X)
-    X = Activation('relu')(X)
-    
-    # Second component of main path (≈3 lines)
-    X = Conv2D(filters= F2, kernel_size=(f, f), padding='same', kernel_initializer='he_normal', name=conv_name_base + '2b')(X)
-    X = BatchNormalization(axis=3, name = bn_name_base+'2b')(X)
-    X = Activation('relu')(X)
  
-    # Third component of main path (≈2 lines)
-    X = Conv2D(filters  = F3, kernel_size=(1, 1), kernel_initializer='he_normal', name = conv_name_base + '2c')(X)
-    X = BatchNormalization(axis=3, name = bn_name_base+'2c')(X)
+    x = Conv2D(filters1, (1, 1), name=conv_name_base + '2a')(input_tensor)       # kernel_initializer='he_normal' ???
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
+    x = Activation('relu')(x)
  
-    # Final step: Add shortcut value to main path, and pass it through a RELU activation (≈2 lines)
-    X = add([X, X_shortcut])
-    X = Activation('relu')(X)
-    return X
+    x = Conv2D(filters2, kernel_size,
+               padding='same', name=conv_name_base + '2b')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
+    x = Activation('relu')(x)
  
-def convolutional_block(input_shape, f, filters, stage, block, s = 2):
+    x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
+ 
+    x = add([x, input_tensor])
+    x = Activation('relu')(x)
+    return x
+
+def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2)):
     
-    # defining name basis
+    filters1, filters2, filters3 = filters
+    if K.image_data_format() == 'channels_last':
+        bn_axis = 3
+    else:
+        bn_axis = 1
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
-    
-    # Retrieve Filters
-    F1, F2, F3 = filters
-    
-    # Save the input value
-    X_shortcut = input_shape
  
-    ##### MAIN PATH #####
-    # First component of main path 
-    X = Conv2D(F1, (1, 1), strides = (s,s), kernel_initializer='he_normal', name = conv_name_base + '2a')(input_shape)
-    X = BatchNormalization(axis = 3, name = bn_name_base + '2a')(X)
-    X = Activation('relu')(X)
+    x = Conv2D(filters1, (1, 1), strides=strides,
+               name=conv_name_base + '2a')(input_tensor)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
+    x = Activation('relu')(x)
  
-    # Second component of main path (≈3 lines)
-    X = Conv2D(F2,(f,f), padding='same', kernel_initializer='he_normal', name=conv_name_base+'2b')(X)
-    X = BatchNormalization(axis=3, name = bn_name_base+'2b')(X)
-    X = Activation('relu')(X)
+    x = Conv2D(filters2, kernel_size, padding='same',
+               name=conv_name_base + '2b')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
+    x = Activation('relu')(x)
  
-    # Third component of main path (≈2 lines)
-    X = Conv2D(F3, (1, 1), kernel_initializer='he_normal',name=conv_name_base+'2c')(X)
-    X = BatchNormalization(axis=3, name = bn_name_base+'2c')(X)
+    x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
  
-    ##### SHORTCUT PATH #### (≈2 lines)
-    X_shortcut = Conv2D(F3,(1,1), strides=(s,s), kernel_initializer='he_normal', name=conv_name_base+'1')(X_shortcut)
-    X_shortcut = BatchNormalization(axis=3 ,name =bn_name_base+'1')(X_shortcut)
+    shortcut = Conv2D(filters3, (1, 1), strides=strides,
+                      name=conv_name_base + '1')(input_tensor)
+    shortcut = BatchNormalization(axis=bn_axis, name=bn_name_base + '1')(shortcut)
  
-    # Final step: Add shortcut value to main path, and pass it through a RELU activation (≈2 lines)
-    X = add([X,X_shortcut])
-    X = Activation('relu')(X)
-    return X
-    
-# GRADED FUNCTION: ResNet50
- 
-def ResNet50(image_shape , NUM_CLASSES):
+    x = add([x, shortcut])
+    x = Activation('relu')(x)
+    return x
 
-
-    # Define the input as a tensor with shape input_shape
-    X_input = Input(image_shape)
+def ResNet50(include_top = False, 
+            weights=None,
+            input_tensor=None, input_shape=None,
+            pooling=None,
+            classes=1000):
+   
+    # if weights not in {'imagenet', None}:
+    #     raise ValueError('The `weights` argument should be either '
+    #                      '`None` (random initialization) or `imagenet` '
+    #                      '(pre-training on ImageNet).')
  
-    # Zero-Padding
-    #X = ZeroPadding2D((16, 16))(X_input)
-    X = ZeroPadding2D(padding=(3, 3), name='conv1_pad')(X_input)
-    # Stage 1
-    X = Conv2D(64, (7, 7), strides = (2, 2), padding='valid', kernel_initializer='he_normal', name = 'conv1')(X)
-    #X = Conv2D(64, (3, 3), padding = 'same', name = 'conv1')(X_input)
-    X = BatchNormalization(axis = 3, name = 'bn_conv1')(X)
-    X = Activation('relu')(X)
-    X = ZeroPadding2D(padding=(1, 1), name='pool1_pad')(X)
-    X = MaxPooling2D((3, 3), strides=(2, 2))(X)
+    # if weights == 'imagenet' and include_top and classes != 1000:
+    #     raise ValueError('If using `weights` as imagenet with `include_top`'
+    #                      ' as true, `classes` should be 1000')
  
-    # Stage 2
-    X = convolutional_block(X, f = 3, filters = [64, 64, 256], stage = 2, block='a', s = 1)
-    X = identity_block(X, 3, [64, 64, 256], stage=2, block='b')
-    X = identity_block(X, 3, [64, 64, 256], stage=2, block='c')
  
-    ### START CODE HERE ###
+    input_shape = _obtain_input_shape(input_shape,
+                                      default_size=224,
+                                      min_size=32,
+                                      data_format=K.image_data_format(),
+                                      require_flatten = include_top)
  
-    # Stage 3 (≈4 lines)
-    X = convolutional_block(X, f = 3,filters= [128,128,512], stage = 3, block='a', s = 2)
-    X = identity_block(X,3,[128,128,512],stage=3,block='b')
-    X = identity_block(X,3,[128,128,512],stage=3,block='c')
-    X = identity_block(X,3,[128,128,512],stage=3,block='d')
+    if input_tensor is None:
+        img_input = Input(shape=input_shape)
+    else:
+        if not K.is_keras_tensor(input_tensor):
+            img_input = Input(tensor=input_tensor, shape=input_shape)
+        else:
+            img_input = input_tensor
+    if K.image_data_format() == 'channels_last':
+        bn_axis = 3
+    else:
+        bn_axis = 1
  
-    # Stage 4 (≈6 lines)
-    X = convolutional_block(X,f=3,filters=[256,256,1024], stage = 4, block='a', s = 2)
-    X = identity_block(X,3,[256,256,1024],stage=4,block='b')
-    X = identity_block(X,3,[256,256,1024],stage=4,block='c')
-    X = identity_block(X,3,[256,256,1024],stage=4,block='d')
-    X = identity_block(X,3,[256,256,1024],stage=4,block='e')
-    X = identity_block(X,3,[256,256,1024],stage=4,block='f')
+    #x = ZeroPadding2D((3, 3))(img_input)
+    x = Conv2D(64, (7, 7), strides=(2, 2), name='conv1')(img_input)
+    x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
+    x = Activation('relu')(x)
+    #x = MaxPooling2D((3, 3), strides=(2, 2))(x)
  
-    # Stage 5 (≈3 lines)
-    X = convolutional_block(X, f = 3,filters= [512,512,2048], stage = 5, block = 'a', s = 2)
-    X = identity_block(X,3,[512,512,2048],stage=5,block='b')
-    X = identity_block(X,3,[512,512,2048],stage=5,block='c')
+    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
  
-    # AVGPOOL (≈1 line). Use "X = AveragePooling2D(...)(X)"
-    X = AveragePooling2D()(X)
-    #X = GlobalAveragePooling2D()(X)
-    
-    # output layer
-    X = Flatten()(X)
-    #X = Dropout(0.5)(X)
-    X = Dense(NUM_CLASSES, activation='softmax')(X)
-    model = Model(X_input, X, name='resnet50')
+    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
  
+    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
+ 
+    x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a')
+    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b')
+    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c')
+ 
+    x = AveragePooling2D(name='avg_pool')(x)
+ 
+    if include_top:
+        x = Flatten()(x)
+        x = Dense(classes, activation='softmax', name='fc1000')(x)
+    else:
+        if pooling == 'avg':
+            x = GlobalAveragePooling2D()(x)
+            x = Dense(classes, activation='softmax', name='resnet50')(x)
+        elif pooling == 'max':
+            x = GlobalMaxPooling2D()(x)
+ 
+    if input_tensor is not None:
+        inputs = get_source_inputs(input_tensor)
+    else:
+        inputs = img_input
+ 
+    model = Model(inputs, x, name='resnet50')
+ 
+ 
+    # if weights == 'imagenet':
+    #     if include_top:
+    #         weights_path = get_file('resnet50_weights_tf_dim_ordering_tf_kernels.h5',
+    #                                 WEIGHTS_PATH,
+    #                                 cache_subdir='models',
+    #                                 md5_hash='a7b3fe01876f51b976af0dea6bc144eb')
+    #     else:
+    #         weights_path = get_file('resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5',
+    #                                 WEIGHTS_PATH_NO_TOP,
+    #                                 cache_subdir='models',
+    #                                 md5_hash='a268eb855778b3df3c7506639542a6af')
+    #     model.load_weights(weights_path)
+    #     if K.backend() == 'theano':
+    #         layer_utils.convert_all_kernels_in_model(model)
+ 
+    #     if K.image_data_format() == 'channels_first':
+    #         if include_top:
+    #             maxpool = model.get_layer(name='avg_pool')
+    #             shape = maxpool.output_shape[1:]
+    #             dense = model.get_layer(name='fc1000')
+    #             layer_utils.convert_dense_weights_data_format(dense, shape, 'channels_first')
+ 
+    #         if K.backend() == 'tensorflow':
+    #             warnings.warn('You are using the TensorFlow backend, yet you '
+    #                           'are using the Theano '
+    #                           'image data format convention '
+    #                           '(`image_data_format="channels_first"`). '
+    #                           'For best performance, set '
+    #                           '`image_data_format="channels_last"` in '
+    #                           'your Keras config '
+    #                           'at ~/.keras/keras.json.')
     return model
-
-# model = ResNet50(input_shape=(32,32,3),classes=10)
-# model.summary()
