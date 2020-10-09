@@ -54,22 +54,22 @@ def train(Alpha):
     hist = tf.keras.callbacks.History()
     start_time = time.time()
 
-    tbCallBack = tf.keras.callbacks.TensorBoard(log_dir='./Graph',  # log 目录
-                                                #histogram_freq=0,  # 按照何等频率（epoch）来计算直方图，0为不计算
-                                                batch_size = BATCH_SIZE,     # 用多大量的数据计算直方图
-                                                write_graph=True,   # 是否存储网络结构图
-                                                write_grads=True,   # 是否可视化梯度直方图
-                                                write_images=True,  # 是否可视化参数
+    tbCallBack = tf.keras.callbacks.TensorBoard(log_dir='./Graph',  # log 目錄
+                                                #histogram_freq=0,  # 按照何等頻率（epoch）來計算長條圖，0為不計算
+                                                batch_size = BATCH_SIZE,     # 用多大量的資料計算長條圖
+                                                write_graph=True,   # 是否存儲網路結構圖
+                                                write_grads=True,   # 是否視覺化梯度長條圖
+                                                write_images=True,  # 是否視覺化參數
                                                 )
 
-    ReduceLRCallBack = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss',  # monitor：被监测的量
-                                                            factor = 0.1,          # factor：每次减少学习率的因子，学习率将以lr = lr*factor的形式被减少
-                                                            patience = 5,          # patience：当patience个epoch过去而模型性能不提升时，学习率减少的动作会被触发
-                                                            verbose = 1,           # verbose：信息展示模式
-                                                            mode = 'min',          # mode：‘auto’，‘min’，‘max’之一，在min模式下，如果检测值触发学习率减少。在max模式下，当检测值不再上升则触发学习率减少
-                                                            #epsilon = 0.0001,     # epsilon：阈值，用来确定是否进入检测值的“平原区”
-                                                            cooldown = 0,          # cooldown：学习率减少后，会经过cooldown个epoch才重新进行正常操作
-                                                            min_lr = 0.000001      # min_lr：学习率的下限
+    ReduceLRCallBack = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss',  # monitor：被監測的量
+                                                            factor = 0.1,          # factor：每次減少學習率的因數，學習率將以lr = lr*factor的形式被減少
+                                                            patience = 5,          # patience：當patience個epoch過去而模型性能不提升時，學習率減少的動作會被觸發
+                                                            verbose = 1,           # verbose：資訊展示模式
+                                                            mode = 'min',          # mode：‘auto’，‘min’，‘max’之一，在min模式下，如果檢測值觸發學習率減少。在max模式下，當檢測值不再上升則觸發學習率減少
+                                                            #epsilon = 0.0001,     # epsilon：閾值，用來確定是否進入檢測值的“平原區”
+                                                            cooldown = 0,          # cooldown：學習率減少後，會經過cooldown個epoch才重新進行正常操作
+                                                            min_lr = 0.000001      # min_lr：學習率的下限
                                                             )
     
     model_EarlyStopping = tf.keras.callbacks.EarlyStopping(monitor = 'val_acc',
